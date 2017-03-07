@@ -1,0 +1,27 @@
+LATEST_SSHD_PID=$(pgrep --newest --uid $(id -u) sshd)
+
+if [[ -z "$LATEST_SSHD_PID" ]]; then
+    echo "could not find an ssh pid, is there a remote login?"
+    return 1
+fi
+
+LATEST_SSH_PID=$(pgrep --oldest --parent "$LATEST_SSHD_PID" bash)
+
+if [[ -z "$LATEST_SSH_PID" ]]; then
+    echo "could not find an bash child of sshd, is there a remote login?"
+    return 1
+fi
+
+echo "importing remote agent environment"
+
+SSH_ENV=$(xargs --null -n 1 echo < "/proc/$LATEST_SSH_PID/environ" | sort | grep SSH)
+
+while read line; do
+    # debug, show export lines
+    #echo "$line"
+    #declare "$line"
+    #declare -x "$line"
+    export "$line"
+done < <(echo "$SSH_ENV")
+
+unset SSH_AGENT_PID
